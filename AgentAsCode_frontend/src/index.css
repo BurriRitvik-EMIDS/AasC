@@ -1,0 +1,98 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Add these styles to your index.css file */
+
+.create-project-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: #f8f9fa;
+}
+
+.header {
+  width: 100%;
+  padding: 10px 0;
+  margin-bottom: 60px;
+}
+
+.logo-title-container {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+}
+
+.emids-logo {
+  height: 32px; /* Increased height for better visibility */
+  width: auto; /* Let width adjust proportionally */
+  max-width: 200px; /* Limit the maximum width */
+  margin-right: -20px;
+  object-fit: contain; /* Ensures logo maintains proportions */
+}
+
+.admin-panel-title {
+  color: #0a2351; /* Deep navy blue color */
+  font-size: 34px;
+  font-weight: 700; /* Increased to bold */
+  font-family: 'Segoe UI', Arial, sans-serif;
+  margin-left: 20px; /* Slightly more space from logo */
+  letter-spacing: 0.5px; /* Increased letter spacing */
+  position: relative;
+  top: -19px; /* Keep your existing vertical alignment */
+  text-transform: uppercase; /* Optional: adds more presence */
+  background: linear-gradient(to right, #0a2351, #2a4c8b); /* Optional: subtle gradient */
+  -webkit-background-clip: text; /* For gradient text */
+  -webkit-text-fill-color: transparent; /* For gradient text */
+  text-shadow: 0 1px 0 rgba(11, 15, 52, 0.4); /* Subtle text embossing */
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.page-title {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #0a2351; /* Navy blue for heading */
+}
+
+.page-subtitle {
+  font-size: 18px;
+  margin-bottom: 32px;
+  color: #666;
+}
+
+.btn-primary {
+  background-color: #0a2351; /* Navy blue to match the admin panel title */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 24px;
+  font-size: 19px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: #06183a; /* Darker navy on hover */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}

@@ -1,0 +1,4 @@
+az acr create --resource-group GEN_AI_DEMO --name agentascodeadminbackend --sku Basic --admin-enabled true
+az containerapp env create --name agentascodebackendcontainer --resource-group GEN_AI_DEMO  --location eastus
+az acr build --registry agentascodeadminbackend --image agentascodeadminbackend:v1.0 .
+az containerapp create --name agentascodeadminbackend --resource-group GEN_AI_DEMO --environment agentascodebackendcontainer --image agentascodeadminbackend.azurecr.io/agentascodeadminbackend:v1.0 --registry-server agentascodeadminbackend.azurecr.io --target-port 8000 --ingress external --query configuration.ingress.fqdn

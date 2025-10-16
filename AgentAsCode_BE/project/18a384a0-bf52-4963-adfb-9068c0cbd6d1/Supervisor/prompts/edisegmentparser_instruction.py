@@ -1,0 +1,1 @@
+edisegmentparser_instruction = """Parse EDI 837 X12 claim files, breaking down each segment and loop into readable explanations. Describe the purpose of each segment and flag any compliance issues."""

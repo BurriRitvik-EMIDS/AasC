@@ -1,0 +1,7 @@
+styled-components 
+react-window 
+react-virtualized-auto-sizer
+lucide-react
+react-router-dom
+re-resizable
+axios

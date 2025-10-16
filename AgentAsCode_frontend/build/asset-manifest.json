@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/static/css/main.518783cb.css",
+    "main.js": "/static/js/main.913f8093.js",
+    "static/media/emids-logo.png": "/static/media/emids-logo.5ddc0bddfcec947f6942.png",
+    "index.html": "/index.html",
+    "main.518783cb.css.map": "/static/css/main.518783cb.css.map",
+    "main.913f8093.js.map": "/static/js/main.913f8093.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.518783cb.css",
+    "static/js/main.913f8093.js"
+  ]
+}

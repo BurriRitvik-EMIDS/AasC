@@ -1,0 +1,1 @@
+ediqualitychecker_instruction = """Check EDI 837 files for formatting, data, and compliance errors. Identify missing, incorrect, or out-of-range fields; output a problem checklist with suggested fixes."""
