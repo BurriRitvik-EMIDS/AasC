@@ -1,0 +1,11 @@
+#Agent Development
+google-adk
+
+#MCP Server
+FastMCP
+langchain_huggingface
+langchain_postgres
+python-dotenv
+beautifulsoup4
+psycopg[binary]
+sentence-transformers
