@@ -15,7 +15,7 @@ function EvaluationMetrics({ projectId, sessionId, messages, onEvaluationComplet
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evaluationResults, setEvaluationResults] = useState(null);
     const [error, setError] = useState(null);
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         // Load available metrics from API if needed

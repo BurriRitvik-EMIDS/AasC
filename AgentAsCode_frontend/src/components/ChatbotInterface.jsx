@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import styles from './ChatInterface.module.css';
 import { Send, User, AlertTriangle, Settings, RefreshCw, Clock, Cpu, BarChart2, Upload, StopCircle } from 'lucide-react';
 import ApiService from '../services/apiservices';
@@ -41,16 +43,80 @@ function ChatbotInterface({ projectId }) {
     const fileInputRef = useRef(null);
     const [evaluationResults, setEvaluationResults] = useState(null);
 
-    // Format message content with line breaks
+    // Custom Pre component with copy button
+    const CodeBlockWithCopy = ({ children, ...props }) => {
+        const [copied, setCopied] = useState(false);
+        const codeRef = useRef(null);
+
+        const handleCopy = () => {
+            const codeText = codeRef.current?.textContent || '';
+            navigator.clipboard.writeText(codeText).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        };
+
+        return (
+            <div className={styles.codeBlockWrapper}>
+                <pre ref={codeRef} className={styles.mdPre} {...props}>
+                    {children}
+                </pre>
+                <button
+                    onClick={handleCopy}
+                    className={styles.copyButton}
+                    title={copied ? 'Copied!' : 'Copy code'}
+                    aria-label="Copy code to clipboard"
+                >
+                    {copied ? (
+                        <span className={styles.copyButtonText}>✓ Copied</span>
+                    ) : (
+                        <span className={styles.copyButtonText}>Copy</span>
+                    )}
+                </button>
+            </div>
+        );
+    };
+
+    // Format message content with ReactMarkdown for clean rendering
     const formatMessageContent = (content) => {
         if (typeof content !== 'string') return content;
-        return content.split('\n').map((line, i, arr) => (
-            <React.Fragment key={i}>
-                {line}
-                {i < arr.length - 1 && <br />}
-            </React.Fragment>
-        ));
+
+        return (
+            <div className={styles.markdownContent}>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        // Custom renderers for better styling
+                        h1: ({ node, ...props }) => <h1 className={styles.mdH1} {...props} />,
+                        h2: ({ node, ...props }) => <h2 className={styles.mdH2} {...props} />,
+                        h3: ({ node, ...props }) => <h3 className={styles.mdH3} {...props} />,
+                        h4: ({ node, ...props }) => <h4 className={styles.mdH4} {...props} />,
+                        p: ({ node, ...props }) => <p className={styles.mdParagraph} {...props} />,
+                        ul: ({ node, ...props }) => <ul className={styles.mdList} {...props} />,
+                        ol: ({ node, ...props }) => <ol className={styles.mdOrderedList} {...props} />,
+                        li: ({ node, ...props }) => <li className={styles.mdListItem} {...props} />,
+                        code: ({ node, inline, ...props }) =>
+                            inline ?
+                                <code className={styles.mdInlineCode} {...props} /> :
+                                <code className={styles.mdCodeBlock} {...props} />,
+                        pre: CodeBlockWithCopy,
+                        a: ({ node, ...props }) => <a className={styles.mdLink} target="_blank" rel="noopener noreferrer" {...props} />,
+                        blockquote: ({ node, ...props }) => <blockquote className={styles.mdBlockquote} {...props} />,
+                        table: ({ node, ...props }) => <table className={styles.mdTable} {...props} />,
+                        th: ({ node, ...props }) => <th className={styles.mdTableHeader} {...props} />,
+                        td: ({ node, ...props }) => <td className={styles.mdTableCell} {...props} />,
+                        strong: ({ node, ...props }) => <strong className={styles.mdBold} {...props} />,
+                        em: ({ node, ...props }) => <em className={styles.mdItalic} {...props} />,
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
+            </div>
+        );
     };
+
     const handleEvaluationComplete = (results) => {
         setEvaluationResults(results);
         console.log('Evaluation completed:', results);

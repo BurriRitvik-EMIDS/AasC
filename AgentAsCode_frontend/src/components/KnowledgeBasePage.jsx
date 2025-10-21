@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './styles.css';
 
 function KnowledgeBasePage({ onBack }) {
@@ -7,6 +9,8 @@ function KnowledgeBasePage({ onBack }) {
   const [activeTool, setActiveTool] = useState('list_projects');
   const [isLoading, setIsLoading] = useState(false);
   const [resultText, setResultText] = useState('');
+  const [isMarkdownContent, setIsMarkdownContent] = useState(false);
+  const [showRawContent, setShowRawContent] = useState(false);
 
   // Form states
   const [checkProjectName, setCheckProjectName] = useState('');
@@ -115,15 +119,52 @@ function KnowledgeBasePage({ onBack }) {
       case 'remove_docs':
         return `Remove documentation for library "${params.library}" from project "${params.project}"${params.version ? ` version ${params.version}` : ' (all versions)'}`;
       case 'fetch_url':
-        return `Fetch content from ${params.url} for project "${params.project}"`;
+        return `Fetch content from ${params.url}`;
       default:
         return JSON.stringify(params);
     }
   };
 
+  // Helper function to detect if content is markdown
+  const isMarkdown = (text) => {
+    if (!text || typeof text !== 'string') return false;
+
+    // If it's very short (less than 100 chars), probably not markdown content
+    if (text.length < 100) return false;
+
+    // Check for common markdown patterns
+    const markdownPatterns = [
+      /^#{1,6}\s+.+$/m,           // Headings: # Heading
+      /\[.+\]\(.+\)/,              // Links: [text](url)
+      /```[\s\S]*?```/,            // Code blocks: ```code```
+      /^\s*[-*+]\s+.+$/m,          // Unordered lists: - item
+      /^\s*\d+\.\s+.+$/m,          // Ordered lists: 1. item
+      /^\s*>\s+.+$/m,              // Blockquotes: > quote
+      /\*\*[^*]+\*\*/,             // Bold: **text**
+      /`[^`]+`/,                   // Inline code: `code`
+      /^\s*\|.+\|.+\|$/m,          // Tables: | col | col |
+      /^---+$/m,                   // Horizontal rules
+      /\n\n/,                      // Multiple line breaks (common in markdown)
+    ];
+
+    // Count how many patterns match
+    let matchCount = 0;
+    for (const pattern of markdownPatterns) {
+      if (pattern.test(text)) {
+        matchCount++;
+      }
+    }
+
+    // If at least 1 markdown pattern is found, consider it markdown
+    // (lowered threshold for better detection)
+    return matchCount >= 1;
+  };
+
   const executeTool = async (toolName, params) => {
     setIsLoading(true);
     setResultText('');
+    setIsMarkdownContent(false);
+    setShowRawContent(false);
     try {
       const prompt = buildPromptForTool(toolName, params);
       const response = await fetch(API_ENDPOINT, {
@@ -135,7 +176,14 @@ function KnowledgeBasePage({ onBack }) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setResultText(data.result || JSON.stringify(data, null, 2));
+      const result = data.result || JSON.stringify(data, null, 2);
+      setResultText(result);
+
+      // Detect if this is markdown content
+      if (toolName === 'fetch_url' && result && !result.startsWith('Failed') && !result.startsWith('Error')) {
+        // For fetch_url, always try to render as markdown unless it's clearly an error
+        setIsMarkdownContent(true);
+      }
     } catch (error) {
       setResultText(`Error: ${error.message}\n\nMake sure:\n1. MCP server is running on http://localhost:8009\n2. API server is running: python main.py`);
     } finally {
@@ -485,8 +533,73 @@ function KnowledgeBasePage({ onBack }) {
                 {/* Result */}
                 {resultText && (
                   <div style={{ marginTop: 20, padding: 16, background: '#f8f9fa', borderRadius: 8, borderLeft: '4px solid #667eea' }}>
-                    <h4 style={{ marginBottom: 10, color: '#333' }}>📋 Result</h4>
-                    <pre style={{ background: 'white', padding: 12, borderRadius: 6, whiteSpace: 'pre-wrap', fontFamily: 'Courier New, monospace', fontSize: 14, maxHeight: 400, overflowY: 'auto' }}>{resultText}</pre>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <h4 style={{ margin: 0, color: '#333' }}>📋 Result</h4>
+                      {isMarkdownContent && (
+                        <button
+                          onClick={() => setShowRawContent(!showRawContent)}
+                          style={{
+                            padding: '6px 12px',
+                            background: showRawContent ? '#667eea' : 'white',
+                            color: showRawContent ? 'white' : '#667eea',
+                            border: '1px solid #667eea',
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 500
+                          }}
+                        >
+                          {showRawContent ? '📄 Show Rendered' : '📝 Show Raw'}
+                        </button>
+                      )}
+                    </div>
+                    {isMarkdownContent && !showRawContent ? (
+                      <div style={{
+                        background: 'white',
+                        padding: 20,
+                        borderRadius: 6,
+                        maxHeight: 600,
+                        overflowY: 'auto',
+                        lineHeight: '1.8',
+                        fontSize: 15,
+                        color: '#333'
+                      }}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({ node, ...props }) => <h1 style={{ marginTop: 32, marginBottom: 16, fontSize: 36, fontWeight: 'bold', borderBottom: '2px solid #e0e0e0', paddingBottom: 8 }} {...props} />,
+                            h2: ({ node, ...props }) => <h2 style={{ marginTop: 28, marginBottom: 14, fontSize: 28, fontWeight: 'bold', borderBottom: '1px solid #e0e0e0', paddingBottom: 6 }} {...props} />,
+                            h3: ({ node, ...props }) => <h3 style={{ marginTop: 24, marginBottom: 12, fontSize: 22, fontWeight: 'bold' }} {...props} />,
+                            h4: ({ node, ...props }) => <h4 style={{ marginTop: 20, marginBottom: 10, fontSize: 18, fontWeight: 'bold' }} {...props} />,
+                            h5: ({ node, ...props }) => <h5 style={{ marginTop: 16, marginBottom: 8, fontSize: 16, fontWeight: 'bold' }} {...props} />,
+                            h6: ({ node, ...props }) => <h6 style={{ marginTop: 14, marginBottom: 6, fontSize: 14, fontWeight: 'bold', color: '#666' }} {...props} />,
+                            p: ({ node, ...props }) => <p style={{ marginBottom: 16, lineHeight: '1.8' }} {...props} />,
+                            ul: ({ node, ...props }) => <ul style={{ marginBottom: 16, paddingLeft: 28, lineHeight: '1.8' }} {...props} />,
+                            ol: ({ node, ...props }) => <ol style={{ marginBottom: 16, paddingLeft: 28, lineHeight: '1.8' }} {...props} />,
+                            li: ({ node, ...props }) => <li style={{ marginBottom: 8 }} {...props} />,
+                            code: ({ node, inline, ...props }) =>
+                              inline ?
+                                <code style={{ background: '#f0f0f0', padding: '3px 8px', borderRadius: 4, fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: 14, color: '#d63384' }} {...props} /> :
+                                <code style={{ display: 'block', background: '#f8f8f8', padding: 16, borderRadius: 6, fontFamily: 'Consolas, Monaco, "Courier New", monospace', fontSize: 14, overflowX: 'auto', marginBottom: 16, border: '1px solid #e0e0e0', lineHeight: '1.6' }} {...props} />,
+                            pre: ({ node, ...props }) => <pre style={{ background: '#f8f8f8', padding: 16, borderRadius: 6, overflowX: 'auto', marginBottom: 16, border: '1px solid #e0e0e0' }} {...props} />,
+                            blockquote: ({ node, ...props }) => <blockquote style={{ borderLeft: '4px solid #667eea', paddingLeft: 20, marginLeft: 0, marginBottom: 16, color: '#555', fontStyle: 'italic', background: '#f9f9f9', padding: '12px 20px', borderRadius: 4 }} {...props} />,
+                            a: ({ node, ...props }) => <a style={{ color: '#667eea', textDecoration: 'underline', fontWeight: 500 }} target="_blank" rel="noopener noreferrer" {...props} />,
+                            table: ({ node, ...props }) => <div style={{ overflowX: 'auto', marginBottom: 16 }}><table style={{ borderCollapse: 'collapse', width: '100%', border: '1px solid #ddd' }} {...props} /></div>,
+                            thead: ({ node, ...props }) => <thead style={{ background: '#f5f5f5' }} {...props} />,
+                            th: ({ node, ...props }) => <th style={{ border: '1px solid #ddd', padding: 12, textAlign: 'left', fontWeight: 'bold' }} {...props} />,
+                            td: ({ node, ...props }) => <td style={{ border: '1px solid #ddd', padding: 12 }} {...props} />,
+                            hr: ({ node, ...props }) => <hr style={{ border: 'none', borderTop: '2px solid #e0e0e0', marginTop: 24, marginBottom: 24 }} {...props} />,
+                            img: ({ node, ...props }) => <img style={{ maxWidth: '100%', height: 'auto', borderRadius: 6, marginTop: 12, marginBottom: 12 }} {...props} />,
+                            strong: ({ node, ...props }) => <strong style={{ fontWeight: 'bold', color: '#222' }} {...props} />,
+                            em: ({ node, ...props }) => <em style={{ fontStyle: 'italic', color: '#555' }} {...props} />,
+                          }}
+                        >
+                          {resultText}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <pre style={{ background: 'white', padding: 12, borderRadius: 6, whiteSpace: 'pre-wrap', fontFamily: 'Courier New, monospace', fontSize: 14, maxHeight: 400, overflowY: 'auto' }}>{resultText}</pre>
+                    )}
                   </div>
                 )}
               </div>
@@ -499,5 +612,3 @@ function KnowledgeBasePage({ onBack }) {
 }
 
 export default KnowledgeBasePage;
-
-

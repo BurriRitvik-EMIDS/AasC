@@ -7,6 +7,9 @@ import requests
 from typing import Optional, List, Dict, Any, Tuple
 from urllib.parse import urljoin, urlparse
 from collections import deque
+import mimetypes
+from docling.document_converter import DocumentConverter
+
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_postgres import PGVector
@@ -20,6 +23,16 @@ try:
     from bs4 import BeautifulSoup  # type: ignore
 except Exception:
     BeautifulSoup = None  # type: ignore
+
+try:
+    from markdownify import markdownify as md  # type: ignore
+except Exception:
+    md = None  # type: ignore
+
+try:
+    from readability import Document  # type: ignore
+except Exception:
+    Document = None  # type: ignore
 
 # ---- Server ----
 mcp = FastMCP("Docs-MCP")
@@ -55,21 +68,143 @@ _vector = PGVector(
 # ---- Helpers ----
 
 
-def _html_to_markdown(html: str) -> str:
+def extract_text_with_docling(source_path: str) -> str:
+    converter = DocumentConverter()
+    doc = converter.convert(source_path).document
+    return doc.export_to_markdown()
+
+
+def _html_to_markdown(html: str) -> Tuple[str, str]:
+    """Convert HTML to clean, readable markdown using readability extraction."""
     if not html:
-        return ""
-    if BeautifulSoup is None:
-        text = re.sub(r"<(script|style)[\s\S]*?</\1>", "", html, flags=re.I)
-        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
-        text = re.sub(r"</p\s*>", "\n\n", text, flags=re.I)
-        text = re.sub(r"<[^>]+>", "", text)
-        return re.sub(r"\n{3,}", "\n\n", text).strip()
-    soup = BeautifulSoup(html, "html.parser")
-    for s in soup(["script", "style", "noscript"]):
-        s.decompose()
-    text = soup.get_text("\n", strip=True)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text
+        return "", ""
+
+    # Use readability to extract main content (like Reader Mode)
+    if Document is not None:
+        try:
+            doc = Document(html)
+            title = doc.title()
+            clean_html = doc.summary()
+
+            # Now convert the clean HTML to markdown
+            if md is not None:
+                try:
+                    markdown_content = md(
+                        clean_html,
+                        heading_style="ATX",
+                        bullets="-",
+                        code_language="",
+                        strip=["script", "style", "noscript"],
+                    )
+                    # Add title at the top
+                    if title:
+                        markdown_content = f"# {title}\n\n{markdown_content.strip()}"
+                    return clean_html, markdown_content.strip()
+                except Exception:
+                    pass
+
+            # Fallback: Use BeautifulSoup on clean HTML
+            if BeautifulSoup is not None:
+                return clean_html, _convert_html_to_markdown_manual(clean_html)
+
+        except Exception as e:
+            print(f"Readability extraction failed: {e}")
+            pass
+
+    # If readability not available, try to clean HTML manually first
+    if BeautifulSoup is not None:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Remove clutter elements
+            for element in soup(["script", "style", "noscript", "nav", "footer", "header", "aside", "iframe", "form"]):
+                element.decompose()
+
+            # Try to find main content
+            main_content = None
+            for selector in ["main", "article", '[role="main"]', ".content", "#content", ".main", "#main"]:
+                main_content = soup.select_one(selector)
+                if main_content:
+                    break
+
+            if main_content:
+                html_to_convert = str(main_content)
+            else:
+                html_to_convert = str(soup)
+
+            # Convert to markdown
+            if md is not None:
+                try:
+                    return html_to_convert, md(html_to_convert, heading_style="ATX", bullets="-", strip=["script", "style"]).strip()
+                except Exception:
+                    pass
+
+            return html_to_convert, _convert_html_to_markdown_manual(html_to_convert)
+        except Exception:
+            pass
+
+    # Last resort: basic text extraction
+    text = re.sub(r"<(script|style)[\s\S]*?</\1>", "", html, flags=re.I)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    return html, re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _convert_html_to_markdown_manual(html: str) -> str:
+    """Manual HTML to Markdown conversion using BeautifulSoup."""
+    if not BeautifulSoup:
+        return html
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Convert headings
+        for i in range(1, 7):
+            for heading in soup.find_all(f"h{i}"):
+                heading.string = f"\n\n{'#' * i} {heading.get_text()}\n\n"
+
+        # Convert links
+        for link in soup.find_all("a"):
+            href = link.get("href", "")
+            text = link.get_text()
+            if href and text:
+                link.string = f"[{text}]({href})"
+
+        # Convert code blocks
+        for code in soup.find_all("pre"):
+            code_text = code.get_text()
+            code.string = f"\n\n```\n{code_text}\n```\n\n"
+
+        # Convert inline code
+        for code in soup.find_all("code"):
+            if code.parent and code.parent.name != "pre":
+                code.string = f"`{code.get_text()}`"
+
+        # Convert lists
+        for ul in soup.find_all("ul"):
+            for li in ul.find_all("li", recursive=False):
+                li.string = f"\n- {li.get_text()}"
+
+        for ol in soup.find_all("ol"):
+            for idx, li in enumerate(ol.find_all("li", recursive=False), 1):
+                li.string = f"\n{idx}. {li.get_text()}"
+
+        # Convert blockquotes
+        for quote in soup.find_all("blockquote"):
+            quote.string = f"\n> {quote.get_text()}\n"
+
+        # Convert paragraphs
+        for p in soup.find_all("p"):
+            p.string = f"{p.get_text()}\n\n"
+
+        # Get text and clean up
+        text = soup.get_text()
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r" +", " ", text)
+        return text.strip()
+    except Exception:
+        return html
 
 
 def _same_scope(scope: str, base: str, target: str) -> bool:
@@ -234,7 +369,9 @@ def scrape_docs(
     scope: str = "subpages",
     followRedirects: bool = True,
 ) -> Dict[str, Any]:
-    """Scrape and index documentation from a URL for a library into a project.
+    """
+    Scrape and index documentation from a URL, file, or folder into a project.
+    Supports: local web files, web docs, folder trees, PDF/DOCX/PPTX via Docling, markdown/txt/html as plain, and web crawl.
 
     Args:
         project: Project name (main grouping) - create new or add to existing
@@ -251,60 +388,155 @@ def scrape_docs(
         Summary of scraping results with page and chunk counts
     """
     version = _normalize_version(version)
-    seen = set()
-    q = deque()
-    q.append((url, 0))
-    pages = 0
-    added = 0
-    timeout = (10, 20)
+    docling_exts = [".pdf", ".docx", ".pptx"]
 
-    while q and pages < maxPages:
-        u, depth = q.popleft()
-        if u in seen:
-            continue
-        seen.add(u)
-        try:
-            resp = requests.get(u, allow_redirects=followRedirects, timeout=timeout, headers={
-                                "User-Agent": "Docs-MCP/1.0"})
-            if resp.status_code != 200 or "text/html" not in resp.headers.get("Content-Type", ""):
-                continue
-            html = resp.text
-            md = _html_to_markdown(html)
-            chunks = _chunk_markdown(md)
+    try:
+        # --- 1. Docling-eligible HTTP(S) files (PDF/DOCX/PPTX) ---
+        if (url.startswith("http://") or url.startswith("https://")) and any(url.lower().endswith(ext) for ext in docling_exts):
+            content = extract_text_with_docling(url)
             docs = [
                 (
-                    c,
+                    chunk,
                     {
                         "project": project,
                         "content_type": content_type,
                         "library": library,
                         "version": version or "unversioned",
-                        "url": u,
-                    },
+                        "url": url,
+                        "fts_content": chunk,
+                    }
                 )
-                for c in chunks
-                if c.strip()
+                for chunk in _chunk_markdown(content)
             ]
-            added += _add_documents(docs)
-            pages += 1
+            added = _add_documents(docs)
+            return {
+                "pagesScraped": 1,
+                "chunksIndexed": added,
+                "message": f"Indexed {added} chunks from {url}"
+            }
 
-            if depth < maxDepth and BeautifulSoup is not None:
-                soup = BeautifulSoup(html, "html.parser")
-                for a in soup.find_all("a", href=True):
-                    href = a.get("href")
-                    if not href or href.startswith("#") or href.startswith("mailto:") or href.startswith("javascript:"):
-                        continue
-                    next_url = urljoin(u, href)
-                    if _same_scope(scope, url, next_url):
-                        q.append((next_url, depth + 1))
-        except Exception:
-            continue
+        # --- 2. Local file/folder handler (with Docling for PDFs, DOCX, PPTX) ---
+        if url.startswith("file://"):
+            path = url[7:]
+            if os.path.isdir(path):
+                found_files = []
+                for root, dirs, files in os.walk(path):
+                    for fname in files:
+                        fpath = os.path.join(root, fname)
+                        found_files.append(fpath)
+                docs = []
+                for fpath in found_files:
+                    ext = os.path.splitext(fpath)[1].lower()
+                    if ext in docling_exts:
+                        content = extract_text_with_docling(fpath)
+                    else:
+                        with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read()
+                    for chunk in _chunk_markdown(content):
+                        docs.append(
+                            (chunk, {
+                                "project": project,
+                                "content_type": content_type,
+                                "library": library,
+                                "version": version or "unversioned",
+                                "url": f"file://{fpath}",
+                                "fts_content": chunk,
+                            })
+                        )
+                added = _add_documents(docs)
+                return {
+                    "pagesScraped": len(found_files),
+                    "chunksIndexed": added,
+                    "message": f"Indexed {added} chunks from folder '{path}'"
+                }
+            elif os.path.isfile(path):
+                ext = os.path.splitext(path)[1].lower()
+                if ext in docling_exts:
+                    content = extract_text_with_docling(path)
+                else:
+                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                docs = [
+                    (
+                        chunk,
+                        {
+                            "project": project,
+                            "content_type": content_type,
+                            "library": library,
+                            "version": version or "unversioned",
+                            "url": url,
+                            "fts_content": chunk,
+                        }
+                    )
+                    for chunk in _chunk_markdown(content)
+                ]
+                added = _add_documents(docs)
+                return {
+                    "pagesScraped": 1,
+                    "chunksIndexed": added,
+                    "message": f"Indexed {added} chunks from file '{path}'"
+                }
+            else:
+                return {"error": f"Path not found: {path}"}
 
-    return {
-        "pagesScraped": pages,
-        "chunksIndexed": added,
-        "message": f"Indexed {added} chunks from {pages} pages for project={project}, library={library}@{version or 'unversioned'} [{content_type}]",
-    }
+        # --- 3. Standard web docs crawling (HTML/doc sites) ---
+        seen = set()
+        q = deque()
+        q.append((url, 0))
+        pages = 0
+        added = 0
+        timeout = (10, 20)
+
+        while q and pages < maxPages:
+            u, depth = q.popleft()
+            if u in seen:
+                continue
+            seen.add(u)
+            try:
+                resp = requests.get(u, allow_redirects=followRedirects, timeout=timeout, headers={
+                                    "User-Agent": "Docs-MCP/1.0"})
+                if resp.status_code != 200 or "text/html" not in resp.headers.get("Content-Type", ""):
+                    continue
+                html = resp.text
+                html, md = _html_to_markdown(html)
+                chunks = _chunk_markdown(md)
+                docs = [
+                    (
+                        chunk,
+                        {
+                            "project": project,
+                            "content_type": content_type,
+                            "library": library,
+                            "version": version or "unversioned",
+                            "url": u,
+                            "fts_content": chunk,
+                        }
+                    )
+                    for chunk in chunks if chunk.strip()
+                ]
+                added += _add_documents(docs)
+                pages += 1
+
+                if depth < maxDepth and BeautifulSoup is not None:
+                    soup = BeautifulSoup(html, "html.parser")
+                    for a in soup.find_all("a", href=True):
+                        href = a.get("href")
+                        if not href or href.startswith("#") or href.startswith("mailto:") or href.startswith("javascript:"):
+                            continue
+                        next_url = urljoin(u, href)
+                        if _same_scope(scope, url, next_url):
+                            q.append((next_url, depth + 1))
+            except Exception as e:
+                print("Web crawl error:", e)
+                continue
+
+        return {
+            "pagesScraped": pages,
+            "chunksIndexed": added,
+            "message": f"Indexed {added} chunks from {pages} pages for project={project}, library={library}@{version or 'unversioned'} [{content_type}]",
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @mcp.tool()
@@ -517,7 +749,8 @@ def fetch_url(url: str, project: str, content_type: str = "docs", followRedirect
             return f"Failed to fetch URL (status {r.status_code})."
         ctype = r.headers.get("Content-Type", "")
         if "text/html" in ctype:
-            return _html_to_markdown(r.text)
+            _, markdown = _html_to_markdown(r.text)
+            return markdown
         if r.text:
             return r.text
         return f"[{len(r.content)} bytes]"

@@ -63,6 +63,9 @@ def init_runner():
         
         Available tools:
         - scrape_docs(project, library, url, version?, content_type='docs', maxPages=50?, maxDepth=2?, scope='subpages'?, followRedirects=True?)
+          - The 'url' argument can be a web URL (https://...), or a local file/folder path using the 'file://' protocol (e.g., file:///path/to/file.txt or file:///path/to/folder).
+          - You are allowed and encouraged to use 'file://' for reading local files and folders, just as you would scrape a website.
+          - Do NOT reject 'file://' arguments; process them as valid sources.
         - search_docs(project, library, query, version?, content_type='docs', limit=5?)
         - list_projects()
         - check_project(project)
@@ -72,7 +75,20 @@ def init_runner():
         - fetch_url(url, project, content_type='docs', followRedirects=True?)
         - detailed_stats(project?, library?, version?)
         
-        Call the appropriate tool based on user request and return the result clearly.
+        IMPORTANT BEHAVIOR:
+        - For fetch_url requests: Return ONLY the raw markdown content from the tool, without any additional text, commentary, or explanation.
+        - For all other tools: Return the tool result clearly formatted.
+        - For any user request mentioning a local file, folder, or 'file://', you must call scrape_docs with the given file/folder path.
+        - Return the backend tool's result, do not refuse or apologize for local file access.
+        - Only apologize if the actual backend returns an error.
+        
+        When the user asks to "Fetch content from [URL]" or similar:
+        1. Call fetch_url with the provided URL
+        2. Return ONLY the exact output from the tool, nothing else
+        3. Do NOT add phrases like "Here is the content" or "I have included"
+        4. Do NOT wrap the content in explanations
+        
+        For other requests, call the appropriate tool and present results in a clear, user-friendly format.
         """,
         tools=[toolset],
     )

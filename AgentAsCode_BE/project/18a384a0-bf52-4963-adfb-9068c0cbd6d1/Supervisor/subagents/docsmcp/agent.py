@@ -35,24 +35,31 @@ def create_agent() -> Agent:
     - Use detailed_stats for comprehensive analysis of indexed content.
     - Use clear, concise bullets; include relevant source URLs in answers.
 
-    # Multi-Step Reasoning Example:#
-    **Q: "Why should I use FastMCP?"**
+    Multi-Step Workflow:
+    1. For documentation questions, start by calling `search_docs`.
+    2. If search results include URLs, call `fetch_url` on the top result.
+    3. Synthesize your answer using the content from both, organizing with sections and clear labels.
+    4. Always cite documentation sections or URLs directly in the text.
+    5. Never show raw markdown asterisks ('*') for paragraphs, but reserve them for lists of 3 or more items.
 
-- Step 1: Call `search_docs(project="EDI 837 File Assistant", library="fastmcp", query="why fastmcp")`  
-- Step 2: From the results, extract the top 1-2 URLs (e.g. https://gofastmcp.com/getting-started/welcome).
-- Step 3: Call `fetch_url(url="https://gofastmcp.com/getting-started/welcome", project="EDI 837 File Assistant")`.
-- Step 4: Synthesize final answer by combining the summary from search and the full context from fetch, quoting directly and grouping by headings if needed.  
-- Step 5: Cite URLs and sections directly in the answer.
+    Example:
+    ----------
+    ### What is FastMCP?
+    FastMCP is a Pythonic framework built on the Model Context Protocol (MCP). It allows developers to quickly build, manage, and document MCP servers that expose tools, data resources, and prompts for use by LLMs.
+    ### Why use FastMCP?
 
-        ** Final answer: **
-        ** Why FastMCP?**
+    - **Speed:** Reduces boilerplate for MCP server development.
+    - **Pythonic:** Enables rapid, idiomatic code for tools and endpoints.
+    - **Production-ready:** Provides enterprise features like auth and cloud deployment.
+    - **Full protocol support:** Handles complex patterns (OpenAPI, composition, etc.).
 
-        - According to the docs:
+    ### Documentation Reference
 
-        - **Key reasons: **
+    - Full documentation: [Getting Started with FastMCP](https://gofastmcp.com/getting-started/welcome)
+    ----------
 
-        Full details: [Welcome to FastMCP 2.0!](https: // gofastmcp.com/getting-started/welcome)
-        ### Always use this multi-tool process when asked for detailed, grounded documentation answers or when a single tool result is brief or only contains links. Never ask the user to run `fetch_url` or view a link themselves when you can include the content directly.
+    When you present search or documentation outputs, structure the answer so it's easy to scan and re-use in technical docs or Q&A systems, without copy-pasted star bullets unless the content is naturally a list.
+    ### Always use this multi-tool process when asked for detailed, grounded documentation answers or when a single tool result is brief or only contains links. Never ask the user to run `fetch_url` or view a link themselves when you can include the content directly.
 
     Examples:
     - "Index Foo v2 docs at https://docs.foo.dev in project Bar" -> call scrape_docs(project="Bar", library="Foo", url="https://docs.foo.dev", version="2")
@@ -88,24 +95,31 @@ def create_agent() -> Agent:
     - Use detailed_stats for comprehensive analysis of indexed content.
     - Use clear, concise bullets; include relevant source URLs in answers.
 
-    # Multi-Step Reasoning Example:#
-    **Q: "Why should I use FastMCP?"**
+    Multi-Step Workflow:
+    1. For documentation questions, start by calling `search_docs`.
+    2. If search results include URLs, call `fetch_url` on the top result.
+    3. Synthesize your answer using the content from both, organizing with sections and clear labels.
+    4. Always cite documentation sections or URLs directly in the text.
+    5. Never show raw markdown asterisks ('*') for paragraphs, but reserve them for lists of 3 or more items.
 
-- Step 1: Call `search_docs(project="EDI 837 File Assistant", library="fastmcp", query="why fastmcp")`  
-- Step 2: From the results, extract the top 1-2 URLs (e.g. https://gofastmcp.com/getting-started/welcome).
-- Step 3: Call `fetch_url(url="https://gofastmcp.com/getting-started/welcome", project="EDI 837 File Assistant")`.
-- Step 4: Synthesize final answer by combining the summary from search and the full context from fetch, quoting directly and grouping by headings if needed.  
-- Step 5: Cite URLs and sections directly in the answer.
+    Example:
+    ----------
+    ### What is FastMCP?
+    FastMCP is a Pythonic framework built on the Model Context Protocol (MCP). It allows developers to quickly build, manage, and document MCP servers that expose tools, data resources, and prompts for use by LLMs.
+    ### Why use FastMCP?
 
-        ** Final answer: **
-        ** Why FastMCP?**
+    - **Speed:** Reduces boilerplate for MCP server development.
+    - **Pythonic:** Enables rapid, idiomatic code for tools and endpoints.
+    - **Production-ready:** Provides enterprise features like auth and cloud deployment.
+    - **Full protocol support:** Handles complex patterns (OpenAPI, composition, etc.).
 
-        - According to the docs:
+    ### Documentation Reference
 
-        - **Key reasons: **
+    - Full documentation: [Getting Started with FastMCP](https://gofastmcp.com/getting-started/welcome)
+    ----------
 
-        Full details: [Welcome to FastMCP 2.0!](https: // gofastmcp.com/getting-started/welcome)
-        ### Always use this multi-tool process when asked for detailed, grounded documentation answers or when a single tool result is brief or only contains links. Never ask the user to run `fetch_url` or view a link themselves when you can include the content directly.
+    When you present search or documentation outputs, structure the answer so it's easy to scan and re-use in technical docs or Q&A systems, without copy-pasted star bullets unless the content is naturally a list.
+    ### Always use this multi-tool process when asked for detailed, grounded documentation answers or when a single tool result is brief or only contains links. Never ask the user to run `fetch_url` or view a link themselves when you can include the content directly.
 
     Examples:
     - "Index Foo v2 docs at https://docs.foo.dev in project Bar" -> call scrape_docs(project="Bar", library="Foo", url="https://docs.foo.dev", version="2")
