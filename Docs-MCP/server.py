@@ -254,7 +254,7 @@ def _match_target_version(available: List[str], target: Optional[str]) -> Option
     return None
 
 
-def _chunk_markdown(text: str, chunk_size: int = 1200, overlap: int = 150) -> List[str]:
+def _chunk_markdown(text: str, chunk_size: int = 1200, overlap: int = 400) -> List[str]:
     chunks: List[str] = []
     i = 0
     n = len(text)
@@ -362,7 +362,7 @@ def scrape_docs(
     project: str,
     library: str,
     url: str,
-    version: Optional[str] = None,
+    version: str = "",
     content_type: str = "docs",
     maxPages: int = 50,
     maxDepth: int = 2,
@@ -544,9 +544,9 @@ def search_docs(
     project: str,
     library: str,
     query: str,
-    version: Optional[str] = None,
+    version: str = "",
     content_type: str = "docs",
-    limit: int = 5,
+    limit: int = 10,
 ) -> str:
     """Search documentation within a project's library.
 
@@ -567,20 +567,23 @@ def search_docs(
         filt["version"] = version
     retriever = _vector.as_retriever(search_type="similarity", search_kwargs={
                                      "k": max(1, int(limit))}, filter=filt)
-    docs = retriever.get_relevant_documents(query)
+    docs = retriever.invoke(query)
     if not docs:
-        return f"No results for '{query}' in project={project}, library={library}, version={version or 'any'}, content_type={content_type}."
-    out: List[str] = []
-    for i, d in enumerate(docs, 1):
-        url = ""
-        if isinstance(d.metadata, dict):
-            url = d.metadata.get("url", "")
-        out.append(
-            f"------------------------------------------------------------\n"
-            f"Result {i}: {url or '(no-url)'}\n\n"
-            f"{getattr(d, 'page_content', '')}\n"
-        )
-    return "".join(out)
+        return (f"No results for '{query}' in project={project}, library={library}, "
+                f"version={version or 'any'}, content_type={content_type}.")
+    # Combine top k chunks, deduplicate, and present as single passage.
+    seen_lines = set()
+    merged_lines = []
+    for d in docs:
+        text = getattr(d, "page_content", None) or getattr(
+            d, "content", None) or getattr(d, "text", None) or str(d)
+        for line in text.split('\n'):
+            line = line.strip()
+            if line and line not in seen_lines:
+                seen_lines.add(line)
+                merged_lines.append(line)
+    final_answer = "\n".join(merged_lines)
+    return final_answer
 
 
 @mcp.tool()
@@ -635,7 +638,7 @@ def check_project(project: str) -> str:
 
 
 @mcp.tool()
-def list_libraries(project: Optional[str] = None) -> str:
+def list_libraries(project: str = "") -> str:
     """List all libraries across projects or within a specific project.
 
     Args:
@@ -680,7 +683,7 @@ def list_libraries(project: Optional[str] = None) -> str:
 
 
 @mcp.tool()
-def find_version(project: str, library: str, content_type: str = "docs", targetVersion: Optional[str] = None) -> str:
+def find_version(project: str, library: str, content_type: str = "docs", targetVersion: str = "") -> str:
     """Find best matching version for a library within project.
 
     Args:
@@ -704,7 +707,7 @@ def find_version(project: str, library: str, content_type: str = "docs", targetV
 
 
 @mcp.tool()
-def remove_docs(project: str, library: str, version: Optional[str] = None, content_type: str = "docs") -> str:
+def remove_docs(project: str, library: str, version: str = "", content_type: str = "docs") -> str:
     """Remove indexed documentation for a library/version from a project.
 
     Args:
@@ -759,7 +762,7 @@ def fetch_url(url: str, project: str, content_type: str = "docs", followRedirect
 
 
 @mcp.tool()
-def detailed_stats(project: Optional[str] = None, library: Optional[str] = None, version: Optional[str] = None) -> str:
+def detailed_stats(project: str = "", library: str = "", version: str = "") -> str:
     """Get detailed statistics with URL-level granularity and flexible filtering.
 
     Args:

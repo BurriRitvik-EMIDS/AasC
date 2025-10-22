@@ -50,7 +50,7 @@ def init_runner():
 
     toolset = MCPToolset(
         connection_params=StreamableHTTPConnectionParams(
-            url="http://localhost:8009/mcp/"
+            url="http://localhost:8009/mcp"
         )
     )
 
